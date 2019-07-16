@@ -3,7 +3,9 @@
 .
 ├── README.md
 └── script
-    └── CpuLog.sh
+    ├── CpuLog.sh
+    ├── MemLog.sh
+    └── Users.sh
 
-1 directory, 2 files
+1 directory, 4 files
 ```
