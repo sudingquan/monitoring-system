@@ -30,3 +30,4 @@ else
     alert="warning"
 fi
 echo "${time} ${min1} ${min5} ${min15} ${usage}"%" ${temp}"℃" ${alert}"
+
