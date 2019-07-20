@@ -1,6 +1,17 @@
 # monitoring_system
 ```
 .
+├── Client
+│   ├── client.c
+│   ├── client_conf
+│   ├── common.c
+│   └── common.h
+├── LogManger
+├── Master
+│   ├── common.c
+│   ├── common.h
+│   ├── master.c
+│   └── master_conf
 ├── README.md
 └── script
     ├── CpuLog.sh
@@ -10,5 +21,5 @@
     ├── SysInfo.sh
     └── Users.sh
 
-1 directory, 7 files
+4 directories, 15 files
 ```
