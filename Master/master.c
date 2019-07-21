@@ -18,20 +18,25 @@ LinkList *link_client;
 void *continue_heartbeat(void *a) {
     printf("child pthread start\n");
     while (1) {
-        printf("LinkList(%d) : \n", link_client->length);
-        for (ListNode *q = link_client->head.next, *p = &(link_client->head); q; q = q->next, p = p->next) {
+        printf("online client number : %d\n", link_client->length);
+        for (ListNode *q = link_client->head.next, *p = &(link_client->head); q;) {
             fflush(stdout);
-            if (heartbeat(ntohs(q->data.sin_port), inet_ntoa(q->data.sin_addr)) != 0) {
+            //printf("p -> %s : %d \n", inet_ntoa(p->data.sin_addr), ntohs(p->data.sin_port));
+            //printf("q -> %s : %d \n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
+            if (heartbeat(ntohs(q->data.sin_port), inet_ntoa(q->data.sin_addr)) == 0) {
+                printf("%s : %d online !\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
+                p = p->next;
+                q = q->next;
+            } else {
                 printf("%s : %d deleting...\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
                 p->next = q->next;
                 clear_listnode(q);
                 q = p->next;
-                continue;
+                link_client->length--;
             }
-            printf("%s : %d online !\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
             sleep(1);
         }
-        printf("NULL\n");
+        printf("End of traversal\n");
         sleep(5);
     }
 }

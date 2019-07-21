@@ -163,9 +163,10 @@ int heartbeat(int port, char *host) {
     ioctl(sockfd, FIONBIO, &imode);
     int n = connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (n < 0 && errno == EINPROGRESS) {
-        printf("in if....\n");
+        //printf("in if....\n");
         retval = select(sockfd + 1, NULL, &wfds, NULL, &timeout);
         if (retval > 0) {
+            //printf("in if if....\n");
             if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *)&len) < 0) {
                 perror("getsockopt");
                 ret = -1;

@@ -1,7 +1,7 @@
 from=192.168.1.30
 to=192.168.1.60
-client_port=8888
 master_port=9973
+client_port=8086
 datadir=/tmp
 PiHealthLog=/tmp/master.log
 INS=1
