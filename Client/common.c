@@ -9,9 +9,13 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <sys/select.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include "common.h"
 
-ListNode *init_listnode(int val) {
+ListNode *init_listnode(struct sockaddr_in val) {
     ListNode *p = (ListNode *)malloc(sizeof(ListNode));
     p->data = val;
     p->next = NULL;
@@ -43,7 +47,7 @@ void clear_linklist(LinkList *l) {
     return ;
 }
 
-int insert(LinkList *l, int ind, int val) {
+int insert(LinkList *l, int ind, struct sockaddr_in val) {
     if (l == NULL) return 0;
     if (ind < 0 || ind > l->length) return 0;
     ListNode *p = &(l->head), *node = init_listnode(val);
@@ -70,14 +74,6 @@ int erase(LinkList *l, int ind) {
     return 1;
 }
 
-void output(LinkList *l) {
-    printf("LinkList(%d) : ", l->length);
-    for (ListNode *p = l->head.next; p; p = p->next) {
-        printf("%d -> ", p->data);
-    }
-    printf("NULL\n");
-}
-
 int socket_connect(int port, char *host) {
 	int sockfd;
 	struct sockaddr_in dest_addr;
@@ -102,7 +98,7 @@ int socket_connect(int port, char *host) {
 
 }
 
-int creat_listen_socket(int port) {
+int create_listen_socket(int port) {
     int listen_socket;
     if ((listen_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket() error");
@@ -136,6 +132,56 @@ int wait_client(int listen_socket) {
     return client_socket;
 }
 
+int heartbeat(int port, char *host) {
+	int sockfd;
+    int retval;
+    struct timeval timeout;
+	struct sockaddr_in dest_addr;
+	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket() error");
+		exit(1);
+	}
+
+	memset(&dest_addr, 0, sizeof(dest_addr));
+	dest_addr.sin_family = AF_INET;
+	dest_addr.sin_port = htons(port);
+	dest_addr.sin_addr.s_addr = inet_addr(host);
+
+	//printf("Connetion TO %s:%d\n",host,port);
+	//fflush(stdout);
+    fd_set wfds;
+    FD_ZERO(&wfds);
+    FD_SET(sockfd, &wfds);
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 300000;
+    unsigned long imode = 1;
+
+    int error = -1;
+    int len = sizeof(error);
+    int ret = -1;
+
+    ioctl(sockfd, FIONBIO, &imode);
+    int n = connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    if (n < 0 && errno == EINPROGRESS) {
+        //printf("in if....\n");
+        retval = select(sockfd + 1, NULL, &wfds, NULL, &timeout);
+        if (retval > 0) {
+            //printf("in if if....\n");
+            if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *)&len) < 0) {
+                perror("getsockopt");
+                ret = -1;
+            }
+            if (error == 0) {
+                ret = 0;
+            } else {
+                ret = -1;
+            }
+        }
+    }
+    close(sockfd);
+    return ret;
+}
+
 int get_conf(char *file, char *key, char *val) {
     FILE *fp = NULL;
     fp = fopen(file, "r");
@@ -159,9 +205,10 @@ int get_conf(char *file, char *key, char *val) {
         p = strstr(str, "=");
         p += 1;
         strcpy(val, p);
+        val[strlen(val) - 1] = 0;
         break;
     }
-    fp = NULL;
     fclose(fp);
+    fp = NULL;
     return 0;
 }

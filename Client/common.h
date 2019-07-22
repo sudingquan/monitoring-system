@@ -9,12 +9,8 @@
 #define _COMMON_H
 // LinkList
 
-typedef struct Client {
-    char ip[20];
-} Client;
-
 typedef struct ListNode {
-    struct Client;
+    struct sockaddr_in data;
     struct ListNode *next;
 } ListNode;
 
@@ -23,7 +19,7 @@ typedef struct LinkList {
     int length;
 } LinkList;
 
-ListNode *init_listnode(int val);
+ListNode *init_listnode(struct sockaddr_in val);
 
 LinkList *init_linklist();
 
@@ -31,11 +27,9 @@ void clear_listnode(ListNode *node);
 
 void clear_linklist(LinkList *l);
 
-int insert(LinkList *l, int ind, int val);
+int insert(LinkList *l, int ind, struct sockaddr_in val);
 
 int erase(LinkList *l, int ind);
-
-void output(LinkList *l);
 
 // LinkList end
 
@@ -45,6 +39,8 @@ int socket_connect(int port, char *host);
 int create_listen_socket(int port);
 
 int wait_client(int listen_socket);
+
+int heartbeat(int port, char *host);
 // socket end
 
 // conf 
