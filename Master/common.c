@@ -208,7 +208,7 @@ int get_conf(char *file, char *key, char *val) {
         val[strlen(val) - 1] = 0;
         break;
     }
-    fp = NULL;
     fclose(fp);
+    fp = NULL;
     return 0;
 }
