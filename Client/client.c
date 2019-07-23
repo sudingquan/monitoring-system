@@ -28,7 +28,8 @@ void heartbeating() {
         while (j--) {
             if (heartbeat(atoi(master_port), master) < 0) {
                 fflush(stdout);
-                printf("\033[31m * \033[0m");
+                //printf("\033[31m * \033[0m");
+                printf("❤️  ");
                 sleep(1);
             } else {
                 printf("心跳成功\n");
@@ -95,7 +96,8 @@ int main() {
             for (int i = 0; i < n; i++) {
                 if (heartbeat(atoi(master_port), master) < 0) {
                     fflush(stdout);
-                    printf("\033[31m * \033[0m");
+                    //printf("\033[31m * \033[0m");
+                    printf("❤️  ");
                     sleep(1);
                 } else {
                     printf("心跳成功\n");
