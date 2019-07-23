@@ -172,6 +172,7 @@ int heartbeat(int port, char *host) {
                 ret = -1;
             }
             if (error == 0) {
+                close(sockfd);
                 ret = 0;
             } else {
                 ret = -1;
@@ -189,6 +190,7 @@ int get_conf(char *file, char *key, char *val) {
         return -1;
     }
     char str[100];
+    int flag = -1;
     while (!feof(fp)) {
         char *p = str;
         fgets(str, 1024, fp);
@@ -206,9 +208,10 @@ int get_conf(char *file, char *key, char *val) {
         p += 1;
         strcpy(val, p);
         val[strlen(val) - 1] = 0;
+        flag = 1;
         break;
     }
     fclose(fp);
     fp = NULL;
-    return 0;
+    return flag;
 }
