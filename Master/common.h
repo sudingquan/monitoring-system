@@ -8,7 +8,6 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 // LinkList
-
 typedef struct ListNode {
     struct sockaddr_in data;
     struct ListNode *next;
@@ -17,11 +16,14 @@ typedef struct ListNode {
 typedef struct LinkList {
     ListNode head;
     int length;
+    int id;
 } LinkList;
 
 ListNode *init_listnode(struct sockaddr_in val);
 
-LinkList *init_linklist();
+LinkList **init_linklist(int ins);
+
+int min_length(LinkList **l, int ins);
 
 void clear_listnode(ListNode *node);
 
@@ -29,8 +31,9 @@ void clear_linklist(LinkList *l);
 
 int insert(LinkList *l, int ind, struct sockaddr_in val);
 
-int erase(LinkList *l, int ind);
+int already_in_linklist(LinkList **l, int ins, struct sockaddr_in client, int *in);
 
+int erase(LinkList *l, int ind);
 // LinkList end
 
 // socket

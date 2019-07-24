@@ -14,44 +14,51 @@
 #include "common.h"
 #define CONF "master_conf"
 
-LinkList *link_client;
+LinkList **link_client;
+
+char master_port[10];
+char client_port[10];
+char from[20];
+char to[20];
+char ins[5];
 
 void *continue_heartbeat(void *a) {
-    printf("child pthread start\n");
+    printf("heartbeat child pthread start\n");
     while (1) {
-        printf("online client number : %d\n", link_client->length);
-        for (ListNode *q = link_client->head.next, *p = &(link_client->head); q;) {
-            fflush(stdout);
-            //printf("p -> %s : %d \n", inet_ntoa(p->data.sin_addr), ntohs(p->data.sin_port));
-            //printf("q -> %s : %d \n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
-            if (heartbeat(ntohs(q->data.sin_port), inet_ntoa(q->data.sin_addr)) == 0) {
-                printf("%s : %d online !\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
-                p = p->next;
-                q = q->next;
-            } else {
-                printf("%s : %d deleting...\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
-                p->next = q->next;
-                clear_listnode(q);
-                q = p->next;
-                link_client->length--;
+        for (int i = 0; i < atoi(ins); i++) {
+            printf("LinkList <%d> online client number : %d\n", i, link_client[i]->length);
+            for (ListNode *q = link_client[i]->head.next, *p = &(link_client[i]->head); q;) {
+                fflush(stdout);
+                if (heartbeat(ntohs(q->data.sin_port), inet_ntoa(q->data.sin_addr)) == 0) {
+                    printf("%s : %d \033[32monline\033[0m !\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
+                    p = p->next;
+                    q = q->next;
+                } else {
+                    printf("%s : %d \033[31mdeleting\033[0m...\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
+                    p->next = q->next;
+                    clear_listnode(q);
+                    q = p->next;
+                    link_client[i]->length--;
+                }
             }
+            printf("End of traversal : LinkList <%d> !\n", i);
             sleep(1);
         }
-        printf("End of traversal\n");
-        sleep(5);
+        printf("End of all traversal !\n");
+        sleep(3);
+    }
+}
+
+void *do_events(void *i) {
+    int id = *(int *)i;
+    while (1) {
+        struct epoll_event ev, events[link_client[id]->length];
+        int conn_sock, nfds, epollfd;
     }
 }
 
 int main() {
-    pthread_t connect_client;
-    link_client = init_linklist();
-    if (link_client == NULL) {
-        exit(1);
-    }
-    char master_port[10];
-    char client_port[10];
-    char from[20];
-    char to[20];
+    pthread_t connect_client[atoi(ins)], heartbeat;
     struct epoll_event ev, events[1];
     int listen_socket, conn_sock, nfds, epollfd;
     struct sockaddr_in client;
@@ -78,12 +85,21 @@ int main() {
         printf("create listen socket failed\n");
         exit(EXIT_FAILURE);
     }
+    if (get_conf(CONF, "INS", ins) < 0) {
+        printf("get master_port failed\n");
+        exit(EXIT_FAILURE);
+    }
 
     epollfd = epoll_create1(0);
     if (epollfd == -1) {
         perror("epoll_create1");
         close(listen_socket);
         exit(EXIT_FAILURE);
+    }
+
+    link_client = init_linklist(atoi(ins));
+    if (link_client == NULL) {
+        exit(1);
     }
 
     ev.events = EPOLLIN;
@@ -99,25 +115,42 @@ int main() {
     printf("from %s to %s\n", from, to);
     int ip_num = htonl(inet_addr(to)) - htonl(inet_addr(from)) + 1;
     for (int i = 0; i < ip_num; i++) {
+        if ((htonl(inet_addr(from)) + i) % 256 == 0 || (htonl(inet_addr(from)) + i) % 256 == 255) {
+            continue;
+        }
         client.sin_family = AF_INET;
 	    client.sin_port = htons(atoi(client_port));
 	    client.sin_addr.s_addr = ntohl(htonl(inet_addr(from)) + i);
-        if (insert(link_client, i, client) > 0) {
-            printf("insert %s to LinkList success\n", inet_ntoa((client.sin_addr)));
+        int min = min_length(link_client, atoi(ins));
+        if (insert(link_client[min], link_client[min]->length, client) > 0) {
+            printf("insert %s to LinkList <%d> success\n", inet_ntoa((client.sin_addr)), min);
         } else {
-            printf("insert %s to LinkList failed\n", inet_ntoa((client.sin_addr)));
+            printf("insert %s to LinkList <%d> failed\n", inet_ntoa((client.sin_addr)), min);
             close(listen_socket);
             close(epollfd);
             exit(EXIT_FAILURE);
         }
     }
-    if (pthread_create(&connect_client, NULL , continue_heartbeat, NULL)) {
+    //heartbeat
+    if (pthread_create(&heartbeat, NULL, continue_heartbeat, NULL)) {
         perror("pthread_create");
         close(listen_socket);
         close(epollfd);
         exit(EXIT_FAILURE);
     }
+
+    //data processing
+    for (int i = 0; i < atoi(ins); i++) {
+        if (pthread_create(&connect_client[i], NULL, do_events, (void *)&(link_client[i]->id))) {
+            perror("pthread_create");
+            close(listen_socket);
+            close(epollfd);
+            exit(EXIT_FAILURE);
+        }
+    }
+
     while (1) {
+        printf("epoll wait...\n");
         nfds = epoll_wait(epollfd, events, 1, -1);
         if (nfds == -1) {
             perror("epoll_wait");
@@ -136,10 +169,17 @@ int main() {
             }
             getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
 	        client.sin_port = htons(atoi(client_port));
-            if (insert(link_client, link_client->length, client) > 0) {
-                printf("insert %s to LinkList success\n", inet_ntoa((client.sin_addr)));
+            int min = min_length(link_client, atoi(ins));
+            int in;
+            if (already_in_linklist(link_client, atoi(ins), client, &in) == 0) {
+                printf("insert %s to LinkList <%d> failed : Already in LinkList <%d>\n", inet_ntoa((client.sin_addr)), min, in);
+                close(conn_sock);
+                continue;
+            }
+            if (insert(link_client[min], link_client[min]->length, client) > 0) {
+                printf("insert %s to LinkList <%d> success\n", inet_ntoa((client.sin_addr)), min);
             } else {
-                printf("insert %s to LinkList failed\n", inet_ntoa((client.sin_addr)));
+                printf("insert %s to LinkList <%d> failed\n", inet_ntoa((client.sin_addr)), min);
                 close(conn_sock);
                 close(listen_socket);
                 close(epollfd);

@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <sys/select.h>
 #include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include "common.h"
 
@@ -22,11 +23,27 @@ ListNode *init_listnode(struct sockaddr_in val) {
     return p;
 }
 
-LinkList *init_linklist() {
-    LinkList *l = (LinkList *)malloc(sizeof(LinkList));
-    l->head.next = NULL;
-    l->length = 0;
+LinkList **init_linklist(int ins) {
+    LinkList **l = (LinkList **)malloc(sizeof(LinkList *) * ins);
+    for (int i = 0; i < ins; i++) {
+        l[i] = (LinkList *)malloc(sizeof(LinkList));
+        l[i]->head.next = NULL;
+        l[i]->length = 0;
+        l[i]->id = i;
+    }
     return l;
+}
+
+int min_length(LinkList **l, int ins) {
+    int min = l[0]->length;
+    int ret = 0;
+    for (int i = 0; i < ins; i++) {
+        if (l[i]->length < min) {
+            min = l[i]->length;
+            ret = i;
+        }
+    }
+    return ret;
 }
 
 void clear_listnode(ListNode *node) {
@@ -57,6 +74,20 @@ int insert(LinkList *l, int ind, struct sockaddr_in val) {
     node->next = p->next;
     p->next = node;
     l->length += 1;
+    return 1;
+}
+
+int already_in_linklist(LinkList **l, int ins, struct sockaddr_in client, int *in) {
+    for (int i = 0; i < ins; i++) {
+        ListNode *p;
+        for (p = &(l[i]->head); p; p = p->next) {
+            if (p->data.sin_addr.s_addr == client.sin_addr.s_addr) {
+                *in = i;
+                return 0;
+            }
+        }
+    }
+    *in = 12345678;
     return 1;
 }
 
@@ -179,6 +210,8 @@ int heartbeat(int port, char *host) {
             }
         }
     }
+    //int off = 0;
+    //setsockopt(sockfd, SOL_SOCKET, SO_DONTLINGER, &off, sizeof(int));
     close(sockfd);
     return ret;
 }
