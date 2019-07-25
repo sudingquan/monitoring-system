@@ -142,6 +142,7 @@ int main() {
         }
     } else {
         while (1) {
+            printf("epoll wait...\n");
            	nfds = epoll_wait(epollfd, events, 1, 1000);
             if (nfds == -1) {
                 perror("epoll_wait");
@@ -150,6 +151,7 @@ int main() {
                 close(epollfd);
                 exit(EXIT_FAILURE);
             } else if (nfds == 0) {
+                printf("master端一段时间无连接，发送心跳信号，开启心跳进程\n");
                 kill(heartbeat_pit, 10);
                 continue;
             }
