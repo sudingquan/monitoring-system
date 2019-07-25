@@ -6,6 +6,7 @@
  ************************************************************************/
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/epoll.h>
@@ -14,8 +15,10 @@
 #include <signal.h>
 #include "common.h"
 #define CONF "client_conf"
+#define MAX_BUFF 100
 
-char client_port[10];
+char heartbeat_client_port[10];
+char ctl_client_port[10];
 char master_port[10];
 char master[20];
 
@@ -45,44 +48,69 @@ void heartbeating() {
 int main() {
     pid_t pid;
     struct epoll_event ev, events[1];
-    int listen_socket, conn_sock, nfds, epollfd;
+    int heartbeat_listen_socket, ctl_listen_socket, conn_sock, nfds, epollfd;
     struct sockaddr_in client;
     unsigned int addrlen = sizeof(client);
 
-    if (get_conf(CONF, "client_port", client_port) < 0) {
-        printf("get ClientPort failed\n");
+    if (get_conf(CONF, "ctl_client_port", ctl_client_port) < 0) {
+        printf("get ctl_client_port failed\n");
+        exit(EXIT_FAILURE);
+    }
+    if (get_conf(CONF, "heartbeat_client_port",heartbeat_client_port) < 0) {
+        printf("get heartbeat_client_port failed\n");
         exit(EXIT_FAILURE);
     }
     if (get_conf(CONF, "master_port", master_port) < 0) {
-        printf("get Master failed\n");
+        printf("get master port failed\n");
         exit(EXIT_FAILURE);
     }
     if (get_conf(CONF, "master", master) < 0) {
         printf("get Master failed\n");
         exit(EXIT_FAILURE);
     }
-    listen_socket = create_listen_socket(atoi(client_port));
-    if (listen_socket < 0) {
-        printf("create listen socket failed\n");
+
+    heartbeat_listen_socket = create_listen_socket(atoi(heartbeat_client_port));
+    if (heartbeat_listen_socket < 0) {
+        printf("create heartbeat listen socket failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    ctl_listen_socket = create_listen_socket(atoi(ctl_client_port));
+    if (ctl_listen_socket < 0) {
+        printf("create control listen socket failed\n");
         exit(EXIT_FAILURE);
     }
 
     epollfd = epoll_create1(0);
     if (epollfd == -1) {
         perror("epoll_create1");
-        close(listen_socket);
+        close(heartbeat_listen_socket);
+        close(ctl_listen_socket);
         exit(EXIT_FAILURE);
     }
 
     ev.events = EPOLLIN;
-    ev.data.fd = listen_socket;
+    ev.data.fd = heartbeat_listen_socket;
 
-    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, listen_socket, &ev) == -1) {
-        perror("epoll_ctl: listen_socket");
-        close(listen_socket);
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, heartbeat_listen_socket, &ev) == -1) {
+        perror("epoll_ctl: heartbeat_listen_socket");
+        close(heartbeat_listen_socket);
+        close(ctl_listen_socket);
         close(epollfd);
         exit(EXIT_FAILURE);
     }
+
+    ev.events = EPOLLIN;
+    ev.data.fd = ctl_listen_socket;
+
+    if (epoll_ctl(epollfd, EPOLL_CTL_ADD, ctl_listen_socket, &ev) == -1) {
+        perror("epoll_ctl: ctl_listen_socket");
+        close(heartbeat_listen_socket);
+        close(ctl_listen_socket);
+        close(epollfd);
+        exit(EXIT_FAILURE);
+    }
+
     pid = fork();
     if (pid == 0) {
         pid_t son;
@@ -90,7 +118,9 @@ int main() {
         if (son == 0) {
             printf("孙子进程等待信号开始心跳\n");
             signal(10, heartbeating);
-            pause();
+            while (1) {
+                pause();
+            }
         } else {
             int n = 10, flag = 0;
             for (int i = 0; i < n; i++) {
@@ -116,23 +146,58 @@ int main() {
            	nfds = epoll_wait(epollfd, events, 1, -1);
             if (nfds == -1) {
                 perror("epoll_wait");
-                close(listen_socket);
+                close(heartbeat_listen_socket);
+                close(ctl_listen_socket);
                 close(epollfd);
                 exit(EXIT_FAILURE);
             }
-            if (events[0].data.fd == listen_socket) {
-                conn_sock = accept(listen_socket, (struct sockaddr *) &client, &addrlen);
-                if (conn_sock == -1) {
-                    perror("accept");
-                    close(conn_sock);
-                    close(listen_socket);
-                    close(epollfd);
-                    exit(EXIT_FAILURE);
-                }
-                getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
-                printf("connect to master %s : %d success\n", inet_ntoa((client.sin_addr)), ntohs(client.sin_port));
+            for (int n = 0; n < nfds; n++) {
+                if (events[n].data.fd == heartbeat_listen_socket) {
+                    conn_sock = accept(heartbeat_listen_socket, (struct sockaddr *) &client, &addrlen);
+                    if (conn_sock == -1) {
+                        perror("accept");
+                        close(conn_sock);
+                        close(heartbeat_listen_socket);
+                        close(ctl_listen_socket);
+                        close(epollfd);
+                        exit(EXIT_FAILURE);
+                    }
+                    getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
+                    printf("recv master %s : %d  ❤️   success\n", inet_ntoa((client.sin_addr)), ntohs(client.sin_port));
 
-                close(conn_sock);
+                    close(conn_sock);
+                } else if (events[n].data.fd == ctl_listen_socket) {
+                    conn_sock = accept(ctl_listen_socket, (struct sockaddr *) &client, &addrlen);
+                    if (conn_sock == -1) {
+                        perror("accept");
+                        close(conn_sock);
+                        close(heartbeat_listen_socket);
+                        close(ctl_listen_socket);
+                        close(epollfd);
+                        exit(EXIT_FAILURE);
+                    }
+                    getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
+                    printf("recv master %s : %d control success\n", inet_ntoa((client.sin_addr)), ntohs(client.sin_port));
+                    char buff[MAX_BUFF] = {0};
+                    int ret = recv(conn_sock, buff, MAX_BUFF, 0);
+                    getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
+                    if (ret < 0) {
+                        perror("recv");
+                    } else if (ret = 0) {
+                        printf("recv from <%s> \n\033[31mfailed\033[0m !", inet_ntoa(client.sin_addr), buff);
+                    } else {
+                        printf("recv from <%s> : %s \n\033[32msuccess\033[0m !", inet_ntoa(client.sin_addr), buff);
+                    }
+                    ret = send(conn_sock, buff, strlen(buff), 0);
+                    getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
+                    if (ret < 0) {
+                        perror("send");
+                    } else if (ret = 0) {
+                        printf("send to <%s> : %s \n\033[31mfailed\033[0m !", inet_ntoa(client.sin_addr), buff);
+                    } else {
+                        printf("send to <%s> : %s \n\033[32msuccess\033[0m !", inet_ntoa(client.sin_addr), buff);
+                    }
+                }
             }
         }
     }

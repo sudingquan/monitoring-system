@@ -118,15 +118,13 @@ int socket_connect(int port, char *host) {
 	dest_addr.sin_port = htons(port);
 	dest_addr.sin_addr.s_addr = inet_addr(host);
 
+    unsigned int imode = 1;
+    ioctl(sockfd, FIONBIO, &imode);
+    
 	//printf("Connetion TO %s:%d\n",host,port);
 	//printf(stdout);
-	if (connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
-		//perror("connect() error");
-		//printf("connect() error : %s!\n", stderror(errno));
-		return -1;
-	}
+	connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
 	return sockfd;
-
 }
 
 int create_listen_socket(int port) {

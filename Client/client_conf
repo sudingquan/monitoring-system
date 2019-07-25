@@ -1,3 +1,4 @@
 master=192.168.1.46
 master_port=9973
-client_port=8086
+heartbeat_client_port=8086
+ctl_client_port=9876

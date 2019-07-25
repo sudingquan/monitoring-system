@@ -6,18 +6,22 @@
  ************************************************************************/
 
 #include <stdio.h>
+#include <string.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
 #include "common.h"
 #define CONF "master_conf"
+#define MAX_BUFF 100
 
 LinkList **link_client;
 
 char master_port[10];
-char client_port[10];
+char client_heartbeat_port[10];
+char client_ctl_port[10];
 char from[20];
 char to[20];
 char ins[5];
@@ -49,11 +53,87 @@ void *continue_heartbeat(void *a) {
     }
 }
 
-void *do_events(void *i) {
+void *do_event(void *i) {
     int id = *(int *)i;
+    printf("send and recv data pthread %d start !\n", id);
     while (1) {
-        struct epoll_event ev, events[link_client[id]->length];
+        int events_num = link_client[id]->length;
+        struct epoll_event ev, events[events_num];
         int conn_sock, nfds, epollfd;
+        struct sockaddr_in client_addr;
+        unsigned int addrlen = sizeof(client_addr);
+        ListNode *p;
+
+        epollfd = epoll_create1(0);
+        if (epollfd == -1) {
+            perror("epoll_create1");
+            return NULL;
+        }
+
+        for (p = link_client[id]->head.next; p; p = p->next) {
+            int sockfd;
+            client_addr = p->data;
+            client_addr.sin_port = htons(atoi(client_ctl_port));
+	        if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		        perror("socket() error");
+		        return NULL;
+	        }
+
+            unsigned int imode = 1;
+            ioctl(sockfd, FIONBIO, &imode);
+	        connect(sockfd, (struct sockaddr *)&client_addr, sizeof(client_addr));
+
+            ev.events = EPOLLOUT;
+            ev.data.fd = sockfd;
+            if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
+                perror("epoll_ctl: sockfd");
+                return NULL;
+            }
+        }
+        while (1) {
+            nfds = epoll_wait(epollfd, events, events_num, 300);
+            if (nfds == -1) {
+                perror("epoll_wait");
+                return NULL;
+            } else if (nfds == 0) {
+                break;
+            }
+            for (int n = 0; n < nfds; n++) {
+                if (events[n].events & EPOLLOUT) {
+                    char buff[MAX_BUFF] = "Hello";
+                    int client = events[n].data.fd;
+                    int ret = send(client, buff, strlen(buff), 0);
+                    getpeername(client, (struct sockaddr *)&client_addr, &addrlen);
+                    if (ret < 0) {
+                        perror("send");
+                    } else if (ret = 0) {
+                        printf("send to <%s> : %s \n\033[31mfailed\033[0m !", inet_ntoa(client_addr.sin_addr), buff);
+                    } else {
+                        printf("send to <%s> : %s \n\033[32msuccess\033[0m !", inet_ntoa(client_addr.sin_addr), buff);
+                    }
+                    ev.events = EPOLLIN;
+                    ev.data.fd = client;
+                    epoll_ctl(epollfd, EPOLL_CTL_MOD, client, &ev);
+                } else if (events[n].events & EPOLLIN) {
+                    char buff[MAX_BUFF] = {0};
+                    int client = events[n].data.fd;
+                    int ret = recv(client, buff, MAX_BUFF, 0);
+                    ev.events = EPOLLIN;
+                    ev.data.fd = client;
+                    getpeername(client, (struct sockaddr *)&client_addr, &addrlen);
+                    if (ret < 0) {
+                        perror("recv");
+                    } else if (ret = 0) {
+                        printf("recv from <%s> \n\033[31mfailed\033[0m !", inet_ntoa(client_addr.sin_addr), buff);
+                    } else {
+                        printf("recv from <%s> : %s \n\033[32msuccess\033[0m !", inet_ntoa(client_addr.sin_addr), buff);
+                    }
+                    epoll_ctl(epollfd, EPOLL_CTL_DEL, client, &ev);
+                    close(client);
+                }
+            }
+        }
+        close(epollfd);
     }
 }
 
@@ -67,8 +147,12 @@ int main() {
         printf("get master_port failed\n");
         exit(EXIT_FAILURE);
     }
-    if (get_conf(CONF, "client_port", client_port) < 0) {
-        printf("get client_port failed\n");
+    if (get_conf(CONF, "client_heartbeat_port", client_heartbeat_port) < 0) {
+        printf("get client_heartbeat_port failed\n");
+        exit(EXIT_FAILURE);
+    }
+    if (get_conf(CONF, "client_ctl_port", client_ctl_port) < 0) {
+        printf("get client_ctl_port failed\n");
         exit(EXIT_FAILURE);
     }
     if (get_conf(CONF, "from", from) < 0) {
@@ -79,14 +163,14 @@ int main() {
         printf("get to failed\n");
         exit(EXIT_FAILURE);
     }
+    if (get_conf(CONF, "INS", ins) < 0) {
+        printf("get INS failed\n");
+        exit(EXIT_FAILURE);
+    }
 
     listen_socket = create_listen_socket(atoi(master_port));
     if (listen_socket < 0) {
         printf("create listen socket failed\n");
-        exit(EXIT_FAILURE);
-    }
-    if (get_conf(CONF, "INS", ins) < 0) {
-        printf("get master_port failed\n");
         exit(EXIT_FAILURE);
     }
 
@@ -119,7 +203,7 @@ int main() {
             continue;
         }
         client.sin_family = AF_INET;
-	    client.sin_port = htons(atoi(client_port));
+	    client.sin_port = htons(atoi(client_heartbeat_port));
 	    client.sin_addr.s_addr = ntohl(htonl(inet_addr(from)) + i);
         int min = min_length(link_client, atoi(ins));
         if (insert(link_client[min], link_client[min]->length, client) > 0) {
@@ -141,7 +225,7 @@ int main() {
 
     //data processing
     for (int i = 0; i < atoi(ins); i++) {
-        if (pthread_create(&connect_client[i], NULL, do_events, (void *)&(link_client[i]->id))) {
+        if (pthread_create(&connect_client[i], NULL, do_event, (void *)&(link_client[i]->id))) {
             perror("pthread_create");
             close(listen_socket);
             close(epollfd);
@@ -168,7 +252,7 @@ int main() {
                 exit(EXIT_FAILURE);
             }
             getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
-	        client.sin_port = htons(atoi(client_port));
+	        client.sin_port = htons(atoi(client_heartbeat_port));
             int min = min_length(link_client, atoi(ins));
             int in;
             if (already_in_linklist(link_client, atoi(ins), client, &in) == 0) {
