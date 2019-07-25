@@ -57,6 +57,9 @@ void *do_event(void *i) {
     int id = *(int *)i;
     printf("send and recv data pthread %d start !\n", id);
     while (1) {
+        if (link_client[id]->length == 0) {
+            continue;
+        }
         int events_num = link_client[id]->length;
         struct epoll_event ev, events[events_num];
         int conn_sock, nfds, epollfd;
@@ -107,9 +110,9 @@ void *do_event(void *i) {
                     if (ret < 0) {
                         perror("send");
                     } else if (ret = 0) {
-                        printf("send to <%s> : %s \n\033[31mfailed\033[0m !", inet_ntoa(client_addr.sin_addr), buff);
+                        printf("send to <%s> : %s \n\033[31mfailed\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
                     } else {
-                        printf("send to <%s> : %s \n\033[32msuccess\033[0m !", inet_ntoa(client_addr.sin_addr), buff);
+                        printf("send to <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
                     }
                     ev.events = EPOLLIN;
                     ev.data.fd = client;
@@ -124,9 +127,9 @@ void *do_event(void *i) {
                     if (ret < 0) {
                         perror("recv");
                     } else if (ret = 0) {
-                        printf("recv from <%s> \n\033[31mfailed\033[0m !", inet_ntoa(client_addr.sin_addr), buff);
+                        printf("recv from <%s> \n\033[31mfailed\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
                     } else {
-                        printf("recv from <%s> : %s \n\033[32msuccess\033[0m !", inet_ntoa(client_addr.sin_addr), buff);
+                        printf("recv from <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
                     }
                     epoll_ctl(epollfd, EPOLL_CTL_DEL, client, &ev);
                     close(client);
@@ -134,6 +137,7 @@ void *do_event(void *i) {
             }
         }
         close(epollfd);
+        sleep(5);
     }
 }
 
