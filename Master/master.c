@@ -58,6 +58,9 @@ void *do_event(void *i) {
     printf("send and recv data pthread %d start !\n", id);
     while (1) {
         if (link_client[id]->length == 0) {
+            printf("link_client <%d> is empty !\n", id);
+            printf("sleep 5s\n");
+            sleep(5);
             continue;
         }
         int events_num = link_client[id]->length;
@@ -224,7 +227,7 @@ int main() {
         }
     }
     //heartbeat
-    if (pthread_create(&heartbeat, NULL, continue_heartbeat, NULL)) {
+    if (pthread_create(&heartbeat, NULL, continue_heartbeat, NULL) < 0) {
         perror("pthread_create");
         close(listen_socket);
         close(epollfd);
@@ -233,7 +236,7 @@ int main() {
 
     //data processing
     for (int i = 0; i < atoi(ins); i++) {
-        if (pthread_create(&connect_client[i], NULL, do_event, (void *)&(link_client[i]->id))) {
+        if (pthread_create(&connect_client[i], NULL, do_event, (void *)&(link_client[i]->id)) < 0) {
             perror("pthread_create");
             close(listen_socket);
             close(epollfd);
