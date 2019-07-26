@@ -208,8 +208,6 @@ int heartbeat(int port, char *host) {
             }
         }
     }
-    //int off = 0;
-    //setsockopt(sockfd, SOL_SOCKET, SO_DONTLINGER, &off, sizeof(int));
     close(sockfd);
     return ret;
 }

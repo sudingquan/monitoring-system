@@ -143,18 +143,19 @@ int main() {
     } else {
         while (1) {
             printf("epoll wait...\n");
-           	nfds = epoll_wait(epollfd, events, 1, 1000);
+           	nfds = epoll_wait(epollfd, events, 1, -1);
             if (nfds == -1) {
                 perror("epoll_wait");
                 close(heartbeat_listen_socket);
                 close(ctl_listen_socket);
                 close(epollfd);
                 exit(EXIT_FAILURE);
-            } else if (nfds == 0) {
-                printf("master端一段时间无连接，发送心跳信号，开启心跳进程\n");
-                kill(heartbeat_pit, 10);
-                continue;
-            }
+            } 
+            //else if (nfds == 0) {
+            //     printf("master端一段时间无连接，发送心跳信号，开启心跳进程\n");
+            //     kill(heartbeat_pit, 10);
+            //     continue;
+            // }
             for (int n = 0; n < nfds; n++) {
                 if (events[n].data.fd == heartbeat_listen_socket) {
                     conn_sock = accept(heartbeat_listen_socket, (struct sockaddr *) &client, &addrlen);
@@ -168,7 +169,6 @@ int main() {
                     }
                     getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
                     printf("recv master %s : %d  ❤️   success\n", inet_ntoa((client.sin_addr)), ntohs(client.sin_port));
-
                     close(conn_sock);
                 } else if (events[n].data.fd == ctl_listen_socket) {
                     conn_sock = accept(ctl_listen_socket, (struct sockaddr *) &client, &addrlen);

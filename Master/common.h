@@ -39,6 +39,8 @@ int erase(LinkList *l, int ind);
 // socket
 int socket_connect(int port, char *host);
 
+void set_reuseaddr(int sockfd, int optval);
+
 int create_listen_socket(int port);
 
 int wait_client(int listen_socket);

@@ -109,8 +109,12 @@ void *do_event(void *i) {
                     getpeername(client, (struct sockaddr *)&client_addr, &addrlen);
                     if (ret < 0) {
                         perror("send");
+                        close(client);
+                        continue;
                     } else if (ret = 0) {
                         printf("send to <%s> : %s \n\033[31mfailed\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
+                        close(client);
+                        continue;
                     } else {
                         printf("send to <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
                     }
