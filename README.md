@@ -2,12 +2,15 @@
 ```
 .
 ├── Client
+│   ├── Makefile
 │   ├── client.c
 │   ├── client_conf
 │   ├── common.c
-│   └── common.h
+│   ├── common.h
+│   └── send_client.sh
 ├── LogManger
 ├── Master
+│   ├── Makefile
 │   ├── common.c
 │   ├── common.h
 │   ├── master.c
@@ -21,5 +24,5 @@
     ├── SysInfo.sh
     └── Users.sh
 
-4 directories, 15 files
+4 directories, 18 files
 ```
