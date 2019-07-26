@@ -138,6 +138,13 @@ int create_listen_socket(int port) {
     my_addr.sin_family = AF_INET;
     my_addr.sin_port = htons(port);
     my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    
+    int yes = 1;
+    if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+        perror("set spckopt reuse");
+        return -1;
+    }
+
     if (bind(listen_socket, (struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
         perror("bind");
         return -1;
