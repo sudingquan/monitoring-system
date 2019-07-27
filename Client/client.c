@@ -26,7 +26,7 @@ char master_port[10];
 char master[20];
 
 void handler(int sig) {	
-	while (waitpid(-1,  NULL,   WNOHANG) > 0) {
+	while (waitpid(-1, NULL, WNOHANG) > 0) {
 		printf("成功处理一个子进程的退出\n");
 	}
     return ;
@@ -41,7 +41,6 @@ void heartbeating() {
         while (j--) {
             if (heartbeat(atoi(master_port), master) < 0) {
                 fflush(stdout);
-                //printf("\033[31m * \033[0m");
                 printf("❤️  ");
                 sleep(1);
             } else {
