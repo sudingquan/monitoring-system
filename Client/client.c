@@ -192,7 +192,7 @@ int main() {
                  printf("\nmaster端30s无连接，发送心跳信号，开启心跳进程\n");
                  kill(pid, 10);
                  continue;
-             }
+            }
             for (int n = 0; n < nfds; n++) {
                 if (events[n].data.fd == heartbeat_listen_socket) {
                     conn_sock = accept(heartbeat_listen_socket, (struct sockaddr *) &client, &addrlen);

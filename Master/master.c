@@ -102,6 +102,7 @@ void *do_event(void *i) {
                 perror("epoll_wait");
                 return NULL;
             } else if (nfds == 0) {
+                printf("epoll wait timeout\n");
                 break;
             }
             for (int n = 0; n < nfds; n++) {
