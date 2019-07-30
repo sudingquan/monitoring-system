@@ -86,8 +86,11 @@ void *do_event(void *i) {
 	        }
 
             unsigned int imode = 1;
-            ioctl(sockfd, FIONBIO, &imode);
-	        connect(sockfd, (struct sockaddr *)&client_addr, sizeof(client_addr));
+            //ioctl(sockfd, FIONBIO, &imode);
+            if (connect(sockfd, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
+                perror("connect");
+                continue;
+            }
 
             ev.events = EPOLLOUT;
             ev.data.fd = sockfd;
