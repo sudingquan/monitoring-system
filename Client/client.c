@@ -19,11 +19,13 @@
 #include "common.h"
 #define CONF "client_conf"
 #define MAX_BUFF 100
+#define LOG_BUFF 1024
 
 char heartbeat_client_port[10];
 char ctl_client_port[10];
 char master_port[10];
 char master[20];
+char dyaver[10] = "0";
 
 void handler(int sig) {	
 	while (waitpid(-1, NULL, WNOHANG) > 0) {
@@ -113,16 +115,167 @@ void *listen_heartbeat(void *a) {
 
 void *generate_log(void *a) {
     printf("generate log child pthread start !\n");
-    FILE *pp=NULL;
-    FILE *fp=NULL;
-    char buff[128]={0};
-    memset(buff,0,sizeof(buff));
-    pp=popen("bash ../script/CpuLog.sh","r");
-    fp=fopen("test.log","a+");
-    fread(buff,1,127,pp);
-    fwrite(buff,1,127,fp);
-    pclose(pp);
-    fclose(fp);
+    while (1) {
+        char cpu_buff[5][LOG_BUFF];
+        char mem_buff[5][LOG_BUFF];
+        char disk_buff[5][LOG_BUFF];
+        char pro_buff[5][LOG_BUFF];
+        char user_buff[5][LOG_BUFF];
+        char sys_buff[5][LOG_BUFF];
+        for (int i = 0; i < 5; i++) {
+            FILE *cpu_pp = NULL;
+            FILE *mem_pp = NULL;
+            FILE *disk_pp = NULL;
+            FILE *pro_pp = NULL;
+            FILE *user_pp = NULL;
+            FILE *sys_pp = NULL;
+            memset(cpu_buff[i], 0, sizeof(cpu_buff[i]));
+            memset(mem_buff[i], 0, sizeof(mem_buff[i]));
+            memset(disk_buff[i], 0, sizeof(disk_buff[i]));
+            memset(pro_buff[i], 0, sizeof(pro_buff[i]));
+            memset(user_buff[i], 0 ,sizeof(user_buff[i]));
+            memset(sys_buff[i], 0, sizeof(sys_buff[i]));
+            cpu_pp = popen("bash ../script/CpuLog.sh","r");
+            char mem_cmd[100];
+            sprintf(mem_cmd, "bash ../script/MemLog.sh %s", dyaver);
+            mem_pp = popen(mem_cmd,"r");
+            disk_pp = popen("bash ../script/Disk.sh","r");
+            pro_pp = popen("bash ../script/Detect.sh","r");
+            user_pp = popen("bash ../script/Users.sh","r");
+            sys_pp = popen("bash ../script/SysInfo.sh","r");
+            if (cpu_pp == NULL) {
+                perror("popen");
+                return NULL;
+            }
+            if (mem_pp == NULL) {
+                perror("popen");
+                return NULL;
+            }
+            if (disk_pp == NULL) {
+                perror("popen");
+                return NULL;
+            }
+            if (pro_pp == NULL) {
+                perror("popen");
+                return NULL;
+            }
+            if (user_pp == NULL) {
+                perror("popen");
+                return NULL;
+            }
+            if (sys_pp == NULL) {
+                perror("popen");
+                return NULL;
+            }
+            if (fread(cpu_buff[i], 1, LOG_BUFF, cpu_pp) < 0) {
+                perror("fread:cpu_buff");
+                return NULL;
+            }
+
+            if (fgets(mem_buff[i], LOG_BUFF, mem_pp) < 0) {
+                perror("fgets:mem_buff");
+                return NULL;
+            }
+            if (fgets(dyaver, LOG_BUFF, mem_pp) < 0) {
+                perror("fgets:dyaver");
+                return NULL;
+            }
+
+            if (fread(disk_buff[i], 1, LOG_BUFF, disk_pp) < 0) {
+                perror("fread:disk_buff");
+                return NULL;
+            }
+            if (fread(pro_buff[i], 1, LOG_BUFF, pro_pp) < 0) {
+                perror("fread:pro_buff");
+                return NULL;
+            }
+            if (fread(user_buff[i], 1, LOG_BUFF, user_pp) < 0) {
+                perror("fread:user_buff");
+                return NULL;
+            }
+            if (fread(sys_buff[i], 1, LOG_BUFF, sys_pp) < 0) {
+                perror("fread:sys_buff");
+                return NULL;
+            }
+            pclose(cpu_pp);
+            pclose(mem_pp);
+            pclose(disk_pp);
+            pclose(pro_pp);
+            pclose(user_pp);
+            pclose(sys_pp);
+            sleep(5);
+        }
+        for (int i = 0; i < 5; i++) {
+            FILE *cpu_fp=NULL;
+            FILE *mem_fp=NULL;
+            FILE *disk_fp=NULL;
+            FILE *pro_fp=NULL;
+            FILE *user_fp=NULL;
+            FILE *sys_fp=NULL;
+            cpu_fp = fopen("Cpu.log", "a");
+            if (cpu_fp == NULL) {
+                perror("fopen:cpu_fp");
+                return NULL;
+            }
+            mem_fp = fopen("Mem.log", "a");
+            if (mem_fp == NULL) {
+                perror("fopen:mem_fp");
+                return NULL;
+            }
+            disk_fp = fopen("Disk.log", "a");
+            if (disk_fp == NULL) {
+                perror("fopen:disk_fp");
+                return NULL;
+            }
+            pro_fp = fopen("Process.log", "a");
+            if (pro_fp == NULL) {
+                perror("fopen:pro_fp");
+                return NULL;
+            }
+            user_fp = fopen("User.log", "a");
+            if (user_fp == NULL) {
+                perror("fopen:user_fp");
+                return NULL;
+            }
+            sys_fp = fopen("Sys.log", "a");
+            if (sys_fp == NULL) {
+                perror("fopen:sys_fp");
+                return NULL;
+            }
+            if (fwrite(cpu_buff[i],1, strlen(cpu_buff[i]), cpu_fp) < 0) {
+                perror("fwrite:cpu_buff");
+                return NULL;
+            }
+            if (fwrite(mem_buff[i],1, strlen(mem_buff[i]), mem_fp) < 0) {
+                perror("fwrite:mem_buff");
+                return NULL;
+            }
+            if (fwrite(disk_buff[i],1, strlen(disk_buff[i]), disk_fp) < 0) {
+                perror("fwrite:disk_buff");
+                return NULL;
+            }
+            if (fwrite(pro_buff[i],1, strlen(pro_buff[i]), pro_fp) < 0) {
+                perror("fwrite:pro_buff");
+                return NULL;
+            }
+            if (fwrite(user_buff[i],1, strlen(user_buff[i]), user_fp) < 0) {
+                perror("fwrite:user_buff");
+                return NULL;
+            }
+            if (fwrite(sys_buff[i],1, strlen(sys_buff[i]), sys_fp) < 0) {
+                perror("fwrite:sys_buff");
+                return NULL;
+            }
+            fclose(cpu_fp);
+            fclose(mem_fp);
+            fclose(disk_fp);
+            fclose(pro_fp);
+            fclose(user_fp);
+            fclose(sys_fp);
+        }
+        printf("完成系统检测，睡眠5s\n");
+        sleep(5);
+    }
 }
 
 int main() {
@@ -173,10 +326,10 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    signal(SIGCHLD,  handler);    //处理子进程，防止僵尸进程的产生
     pid = fork();
     if (pid == 0) {
         son = fork();
+        signal(SIGCHLD,  handler);    //处理子进程，防止僵尸进程的产生
         if (son != 0) {
             printf("子进程等待信号开始心跳\n");
             signal(10, heartbeating);
@@ -208,15 +361,12 @@ int main() {
         pthread_t log;
 
         //log process
-        /*
         if (pthread_create(&log, NULL, generate_log, NULL) < 0) {
             perror("pthread_create");
             close(ctl_listen_socket);
             close(epollfd);
             exit(EXIT_FAILURE);
         }
-        */
-
         pthread_t listen_heart;
         if (pthread_create(&listen_heart, NULL, listen_heartbeat, NULL) < 0) {
             perror("pthread_create");

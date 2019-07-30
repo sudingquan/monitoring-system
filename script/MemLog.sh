@@ -11,3 +11,4 @@ left=$[ ${total} - ${used} ]
 MemAvaPrec=`echo "scale=1;${used}*100/${total}" | bc`
 DyAver=`echo "scale=1;${DyAver}*0.3+${MemAvaPrec}*0.7" | bc`
 echo "${time} ${total}M ${left}M ${MemAvaPrec}% ${DyAver}%";
+echo "${DyAver}"
