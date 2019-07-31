@@ -85,7 +85,7 @@ void *do_event(void *i) {
 		        return NULL;
 	        }
 
-            unsigned int imode = 1;
+            //unsigned int imode = 1;
             //ioctl(sockfd, FIONBIO, &imode);
             if (connect(sockfd, (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
                 perror("connect");
