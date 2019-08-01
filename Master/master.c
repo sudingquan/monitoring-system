@@ -13,9 +13,10 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include "common.h"
 #define CONF "master_conf"
-#define MAX_BUFF 100
+#define MAX_SIZE 1024
 
 LinkList **link_client;
 
@@ -92,7 +93,7 @@ void *do_event(void *i) {
                 continue;
             }
 
-            ev.events = EPOLLOUT;
+            ev.events = EPOLLIN;
             ev.data.fd = sockfd;
             if (epoll_ctl(epollfd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
                 perror("epoll_ctl: sockfd");
@@ -109,41 +110,44 @@ void *do_event(void *i) {
                 break;
             }
             for (int n = 0; n < nfds; n++) {
-                if (events[n].events & EPOLLOUT) {
-                    char buff[MAX_BUFF] = "Hello";
+                if (events[n].events & EPOLLIN) {
                     int client = events[n].data.fd;
-                    int ret = send(client, buff, strlen(buff), 0);
+                    char data[MAX_SIZE + 5];
                     getpeername(client, (struct sockaddr *)&client_addr, &addrlen);
-                    if (ret < 0) {
-                        perror("send");
-                        close(client);
-                        continue;
-                    } else if (ret = 0) {
-                        printf("send to <%s> : %s \n\033[31mfailed\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
+                    mkdir(inet_ntoa(client_addr.sin_addr), 0755);
+                    char cpu_log_filename[100] = {0};
+                    char path[100] = {0};
+                    int ret = recv(client, cpu_log_filename, 100, 0);
+                    if (ret != 100) {
+                        printf("recv cpu log name from <%s> : %s \n\033[31mfaliled\033[0m !\n", inet_ntoa(client_addr.sin_addr), cpu_log_filename);
                         close(client);
                         continue;
                     } else {
-                        printf("send to <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
+                        printf("recv cpu log name from <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client_addr.sin_addr), cpu_log_filename);
                     }
-                    ev.events = EPOLLIN;
-                    ev.data.fd = client;
-                    epoll_ctl(epollfd, EPOLL_CTL_MOD, client, &ev);
-                } else if (events[n].events & EPOLLIN) {
-                    char buff[MAX_BUFF] = {0};
-                    int client = events[n].data.fd;
-                    int ret = recv(client, buff, MAX_BUFF, 0);
-                    ev.events = EPOLLIN;
-                    ev.data.fd = client;
-                    getpeername(client, (struct sockaddr *)&client_addr, &addrlen);
-                    if (ret < 0) {
-                        perror("recv");
-                    } else if (ret = 0) {
-                        printf("recv from <%s> \n\033[31mfailed\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
-                    } else {
-                        printf("recv from <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client_addr.sin_addr), buff);
+                    FILE *cpu_fp = NULL;
+                    printf("cpu log filename is %s\n", cpu_log_filename);
+                    sprintf(path, "%s/%s", inet_ntoa(client_addr.sin_addr), cpu_log_filename);
+                    printf("cpu log filename is %s\n", path);
+                    cpu_fp = fopen(path, "a+");
+                    if (cpu_fp == NULL) {
+                        perror("fopen:cpu_fp");
+                        close(client);
+                        continue;
                     }
-                    epoll_ctl(epollfd, EPOLL_CTL_DEL, client, &ev);
-                    close(client);
+                    printf("\033[32mrecv...\033[0m\n");
+                    while (1) {
+                        memset(data, 0, sizeof(data));
+                        int i = recv(client, data, MAX_SIZE, 0);
+                        if (i == 0) {
+                            fclose(cpu_fp);
+                            close(client);
+                            cpu_fp = NULL;
+                            printf("\033[32mrecv complete\033[0m\n");
+                            break;
+                        }
+                        fwrite(data, 1, i, cpu_fp);
+                    }
                 }
             }
         }

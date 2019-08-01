@@ -17,10 +17,11 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/shm.h>
+#include <sys/file.h>
 #include "common.h"
 #define CONF "client_conf"
-#define MAX_BUFF 100
 #define LOG_BUFF 1024
+#define MAX_SIZE 1024
 
 char heartbeat_client_port[10];
 char ctl_client_port[10];
@@ -249,6 +250,26 @@ void *generate_log(void *a) {
                 perror("fopen:sys_fp");
                 return NULL;
             }
+
+            if (flock(fileno(cpu_fp), LOCK_EX) < 0) {
+                perror("flock:cpu_fp");
+            }
+            if (flock(fileno(mem_fp), LOCK_EX) < 0) {
+                perror("flock:mem_fp");
+            }
+            if (flock(fileno(disk_fp), LOCK_EX) < 0) {
+                perror("flock:disk_fp");
+            }
+            if (flock(fileno(pro_fp), LOCK_EX) < 0) {
+                perror("flock:pro_fp");
+            }
+            if (flock(fileno(user_fp), LOCK_EX) < 0) {
+                perror("flock:user_fp");
+            }
+            if (flock(fileno(sys_fp), LOCK_EX) < 0) {
+                perror("flock:sys_fp");
+            }
+
             if (fwrite(cpu_buff[i],1, strlen(cpu_buff[i]), cpu_fp) < 0) {
                 perror("fwrite:cpu_buff");
                 return NULL;
@@ -291,7 +312,6 @@ int main() {
     int ctl_listen_socket, conn_sock, nfds, epollfd;
     struct sockaddr_in client;
     unsigned int addrlen = sizeof(client);
-    char buff[MAX_BUFF] = {0};
 
     int shmid;
     void *share_memory = NULL;
@@ -440,48 +460,64 @@ int main() {
                     getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
                     printf("recv master %s : %d control success\n", inet_ntoa((client.sin_addr)), ntohs(client.sin_port));
                     int imode = 1;
-                    ioctl(conn_sock, FIONBIO, &imode); //将新连接设置成非阻塞状态
-                    ev.events = EPOLLIN; //将新连接加入epoll监听
+                    //ioctl(conn_sock, FIONBIO, &imode); //将新连接设置成非阻塞状态
+                    ev.events = EPOLLOUT; //将新连接加入epoll监听
                     ev.data.fd = conn_sock;
                     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, conn_sock, &ev) == -1) {
                         perror("epoll_ctl: conn_sock");
                         exit(EXIT_FAILURE);
                     }
-                } else if(events[n].events & EPOLLIN) {
-                    conn_sock = events[n].data.fd;
-                    int ret = recv(conn_sock, buff, MAX_BUFF, 0);
-                    getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
-                    if (ret < 0) {
-                        perror("recv");
-                    } else if (ret = 0) {
-                        printf("recv from <%s> \n\033[31mfailed\033[0m !\n", inet_ntoa(client.sin_addr), buff);
-                    } else {
-                        printf("recv from <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client.sin_addr), buff);
-                    }
-                    ev.events = EPOLLOUT;
-                    ev.data.fd = conn_sock;
-                    if (epoll_ctl(epollfd, EPOLL_CTL_MOD, conn_sock, &ev) < 0) {
-                        perror("epoll_ctl: conn_sock");
-                        exit(EXIT_FAILURE);
-                    }
                 } else if (events[n].events & EPOLLOUT) {
                     conn_sock = events[n].data.fd;
-                    int ret = send(conn_sock, buff, strlen(buff), 0);
+                    char cpu_log_filename[100] = "Cpu.log";
+                    int ret = send(conn_sock, cpu_log_filename, 100, 0);
                     getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
                     if (ret < 0) {
                         perror("send");
+                        close(conn_sock);
+                        continue;
                     } else if (ret = 0) {
-                        printf("send to <%s> : %s \n\033[31mfailed\033[0m !\n", inet_ntoa(client.sin_addr), buff);
+                        printf("send cpu log name to <%s> : \n\033[31mfailed\033[0m !\n", inet_ntoa(client.sin_addr));
+                        close(conn_sock);
+                        continue;
                     } else {
-                        printf("send to <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client.sin_addr), buff);
+                        printf("send cpu log name to <%s> : \n\033[32msuccess\033[0m !\n", inet_ntoa(client.sin_addr));
                     }
-                    ev.events = EPOLLOUT;
-                    ev.data.fd = conn_sock;
-                    if (epoll_ctl(epollfd, EPOLL_CTL_DEL, conn_sock, &ev) < 0) {
-                        perror("epoll_ctl: conn_sock");
-                        exit(EXIT_FAILURE);
+                    FILE *cpu_fp = NULL;
+                    char data[MAX_SIZE + 5];
+                    cpu_fp = fopen(cpu_log_filename, "r");
+                    if (cpu_fp == NULL) {
+                        printf("open file error\n");
+                        close(conn_sock);
+                        continue;
                     }
+                    if (flock(fileno(cpu_fp), LOCK_EX) < 0) {
+                        perror("flock");
+                        close(conn_sock);
+                        fclose(cpu_fp);
+                        continue;
+                    }
+                    printf("\033[32msend file ...\033[0m\n");
+                    while (!feof(cpu_fp)) {
+                        memset(data, 0, sizeof(data));
+                        int i = fread(data, 1, MAX_SIZE, cpu_fp);
+                        ret = send(conn_sock, data, i, 0);
+                        if (ret < 0) {
+                            printf("\033[31msend log fail\033[0m\n");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+                    printf("\033[32mcomplete!\033[0m\n");
                     close(conn_sock);
+                    FILE *cpu_fp_clear = NULL;
+                    cpu_fp_clear = fopen(cpu_log_filename, "w");
+                    if (cpu_fp == NULL) {
+                        printf("open file error\n");
+                        close(conn_sock);
+                        continue;
+                    }
+                    fclose(cpu_fp);
+                    fclose(cpu_fp_clear);
                 }
             }
         }
