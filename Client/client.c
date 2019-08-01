@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/shm.h>
 #include "common.h"
 #define CONF "client_conf"
 #define MAX_BUFF 100
@@ -26,6 +27,12 @@ char ctl_client_port[10];
 char master_port[10];
 char master[20];
 char dyaver[10] = "0";
+
+struct sm_msg{
+    int flag;
+    pthread_mutex_t sm_mutex;
+    pthread_cond_t sm_ready;
+};
 
 void handler(int sig) {	
 	while (waitpid(-1, NULL, WNOHANG) > 0) {
@@ -286,6 +293,32 @@ int main() {
     unsigned int addrlen = sizeof(client);
     char buff[MAX_BUFF] = {0};
 
+    int shmid;
+    void *share_memory = NULL;
+    pthread_mutexattr_t m_attr;
+    pthread_condattr_t c_attr;
+
+    pthread_mutexattr_init(&m_attr);
+    pthread_condattr_init(&c_attr);
+
+    pthread_mutexattr_setpshared(&m_attr, PTHREAD_PROCESS_SHARED);
+    pthread_condattr_setpshared(&c_attr, PTHREAD_PROCESS_SHARED);
+
+    if ((shmid = shmget(IPC_PRIVATE, sizeof(struct sm_msg), 0666 | IPC_CREAT)) == -1) {
+        perror("shmget");
+        exit(1);
+    }
+
+    if ((share_memory = shmat(shmid, 0, 0)) == NULL) {
+        perror("shmat");
+        exit(1);
+    }
+
+    struct sm_msg *msg = (struct sm_msg *)share_memory;
+
+    pthread_mutex_init(&(msg->sm_mutex), &m_attr);
+    pthread_cond_init(&msg->sm_ready, &c_attr);
+
     if (get_conf(CONF, "ctl_client_port", ctl_client_port) < 0) {
         printf("get ctl_client_port failed\n");
         exit(EXIT_FAILURE);
@@ -329,12 +362,14 @@ int main() {
     pid = fork();
     if (pid == 0) {
         son = fork();
-        signal(SIGCHLD,  handler);    //处理子进程，防止僵尸进程的产生
+        signal(SIGCHLD, handler);    //处理子进程，防止僵尸进程的产生
         if (son != 0) {
-            printf("子进程等待信号开始心跳\n");
-            signal(10, heartbeating);
             while (1) {
-                pause();
+                printf("子进程等待信号开始心跳\n");
+                pthread_mutex_lock(&msg->sm_mutex);
+                pthread_cond_wait(&msg->sm_ready, &msg->sm_mutex);
+                pthread_mutex_unlock(&msg->sm_mutex);
+                heartbeating();
             }
         } else {
             printf("孙子进程开始自检\n");
@@ -354,7 +389,9 @@ int main() {
             printf("\n");
             if (flag == 0) {
                 printf("孙子进程给父进程发送心跳信号，开启心跳进程\n");
-                kill(getppid(), 10);
+                pthread_mutex_lock(&msg->sm_mutex);
+                pthread_cond_signal(&msg->sm_ready);
+                pthread_mutex_unlock(&msg->sm_mutex);
             }
         }
     } else {
@@ -384,9 +421,11 @@ int main() {
                 close(epollfd);
                 exit(EXIT_FAILURE);
             } else if (nfds == 0) {
-                 printf("\nmaster端30s无连接，发送心跳信号，开启心跳进程\n");
-                 kill(pid, 10);
-                 continue;
+                printf("\nmaster端30s无连接，发送心跳信号，开启心跳进程\n");
+                pthread_mutex_lock(&msg->sm_mutex);
+                pthread_cond_signal(&msg->sm_ready);
+                pthread_mutex_unlock(&msg->sm_mutex);
+                continue;
             }
             for (int n = 0; n < nfds; n++) {
                 if (events[n].data.fd == ctl_listen_socket) {
