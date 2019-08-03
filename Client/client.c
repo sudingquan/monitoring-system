@@ -35,6 +35,11 @@ struct sm_msg{
     pthread_cond_t sm_ready;
 };
 
+typedef struct Log {
+    char data[MAX_SIZE + 5];
+    int flag;
+} Log;
+
 void handler(int sig) {	
 	while (waitpid(-1, NULL, WNOHANG) > 0) {
 		printf("成功处理一个子进程的退出\n");
@@ -469,55 +474,55 @@ int main() {
                     }
                 } else if (events[n].events & EPOLLOUT) {
                     conn_sock = events[n].data.fd;
-                    char cpu_log_filename[100] = "Cpu.log";
-                    int ret = send(conn_sock, cpu_log_filename, 100, 0);
+                    char log_filename[6][20] = {"Cpu.log", "Mem.log", "Disk.log", "Process.log", "User.log", "Sys.log"};
                     getpeername(conn_sock, (struct sockaddr *)&client, &addrlen);
-                    if (ret < 0) {
-                        perror("send");
-                        close(conn_sock);
-                        continue;
-                    } else if (ret = 0) {
-                        printf("send cpu log name to <%s> : \n\033[31mfailed\033[0m !\n", inet_ntoa(client.sin_addr));
-                        close(conn_sock);
-                        continue;
-                    } else {
-                        printf("send cpu log name to <%s> : \n\033[32msuccess\033[0m !\n", inet_ntoa(client.sin_addr));
-                    }
-                    FILE *cpu_fp = NULL;
-                    char data[MAX_SIZE + 5];
-                    cpu_fp = fopen(cpu_log_filename, "r");
-                    if (cpu_fp == NULL) {
-                        printf("open file error\n");
-                        close(conn_sock);
-                        continue;
-                    }
-                    if (flock(fileno(cpu_fp), LOCK_EX) < 0) {
-                        perror("flock");
-                        close(conn_sock);
-                        fclose(cpu_fp);
-                        continue;
-                    }
-                    printf("\033[32msend file ...\033[0m\n");
-                    while (!feof(cpu_fp)) {
-                        memset(data, 0, sizeof(data));
-                        int i = fread(data, 1, MAX_SIZE, cpu_fp);
-                        ret = send(conn_sock, data, i, 0);
-                        if (ret < 0) {
-                            printf("\033[31msend log fail\033[0m\n");
-                            exit(EXIT_FAILURE);
+                    for (int i = 0; i < 6; i++) {
+                        Log *log = (Log *)malloc(sizeof(Log));
+                        log->flag = i;
+                        FILE *fp = NULL;
+                        fp = fopen(log_filename[i], "r");
+                        if (fp == NULL) {
+                            printf("open %s error\n", log_filename[i]);
+                            break;
                         }
+                        if (flock(fileno(fp), LOCK_EX) < 0) {
+                            perror("flock");
+                            fclose(fp);
+                            break;
+                        }
+                        printf("flag = %d\n", log->flag);
+                        char ch=fgetc(fp);
+                        if (ch == EOF) {
+                            printf("file empty !\n");
+                            fclose(fp);
+                            continue;
+                        }
+                        fseek(fp, 0, SEEK_SET);
+                        printf("flag = %d\n", log->flag);
+                        printf("\033[32msend file ...\033[0m\n");
+                        while (!feof(fp)) {
+                            memset(log->data, 0, sizeof(log->data));
+                            int j = fread(log->data, 1, sizeof(log->data), fp);
+                            int ret = send(conn_sock, log, sizeof(Log), 0);
+                            if (ret < 0) {
+                                printf("\033[31msend %s fail\033[0m\n", log_filename[i]);
+                                break;
+                            }
+                        }
+                        printf("\033[32msend complete\033[0m\n");
+                        printf("start clear log\n");
+                        FILE *fp_clear = NULL;
+                        fp_clear = fopen(log_filename[i], "w");
+                        if (fp_clear == NULL) {
+                            printf("open file error\n");
+                            fclose(fp);
+                            break;
+                        }
+                        fclose(fp);
+                        fclose(fp_clear);
+                        printf("\033[32mclear success\033[0m\n");
                     }
-                    printf("\033[32mcomplete!\033[0m\n");
                     close(conn_sock);
-                    FILE *cpu_fp_clear = NULL;
-                    cpu_fp_clear = fopen(cpu_log_filename, "w");
-                    if (cpu_fp == NULL) {
-                        printf("open file error\n");
-                        close(conn_sock);
-                        continue;
-                    }
-                    fclose(cpu_fp);
-                    fclose(cpu_fp_clear);
                 }
             }
         }

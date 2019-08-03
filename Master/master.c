@@ -27,6 +27,11 @@ char from[20];
 char to[20];
 char ins[5];
 
+typedef struct Log {
+    char data[MAX_SIZE + 5];
+    int flag;
+} Log;
+
 void *continue_heartbeat(void *a) {
     printf("heartbeat child pthread start\n");
     while (1) {
@@ -112,42 +117,50 @@ void *do_event(void *i) {
             for (int n = 0; n < nfds; n++) {
                 if (events[n].events & EPOLLIN) {
                     int client = events[n].data.fd;
-                    char data[MAX_SIZE + 5];
+                    int log_size = sizeof(Log);
+                    Log *log = (Log *)malloc(sizeof(Log));
                     getpeername(client, (struct sockaddr *)&client_addr, &addrlen);
                     mkdir(inet_ntoa(client_addr.sin_addr), 0755);
-                    char cpu_log_filename[100] = {0};
-                    char path[100] = {0};
-                    int ret = recv(client, cpu_log_filename, 100, 0);
-                    if (ret != 100) {
-                        printf("recv cpu log name from <%s> : %s \n\033[31mfaliled\033[0m !\n", inet_ntoa(client_addr.sin_addr), cpu_log_filename);
-                        close(client);
-                        continue;
-                    } else {
-                        printf("recv cpu log name from <%s> : %s \n\033[32msuccess\033[0m !\n", inet_ntoa(client_addr.sin_addr), cpu_log_filename);
-                    }
-                    FILE *cpu_fp = NULL;
-                    printf("cpu log filename is %s\n", cpu_log_filename);
-                    sprintf(path, "%s/%s", inet_ntoa(client_addr.sin_addr), cpu_log_filename);
-                    printf("cpu log filename is %s\n", path);
-                    cpu_fp = fopen(path, "a+");
-                    if (cpu_fp == NULL) {
-                        perror("fopen:cpu_fp");
-                        close(client);
-                        continue;
-                    }
-                    printf("\033[32mrecv...\033[0m\n");
+                    char log_filename[6][20] = {"Cpu.log", "Mem.log", "Disk.log", "Process.log", "User.log", "Sys.log"};
                     while (1) {
-                        memset(data, 0, sizeof(data));
-                        int i = recv(client, data, MAX_SIZE, 0);
-                        if (i == 0) {
-                            fclose(cpu_fp);
-                            close(client);
-                            cpu_fp = NULL;
-                            printf("\033[32mrecv complete\033[0m\n");
+                        printf("\033[32mrecv file ...\033[0m\n");
+                        memset(log->data, 0, sizeof(log->data));
+                        int j = recv(client, log, log_size, 0);
+                        int end = 0;
+                        if (j == 0) {
                             break;
                         }
-                        fwrite(data, 1, i, cpu_fp);
+                        while (j != log_size) {
+                            int left = log_size - j;
+                            int i = recv(client, log, left, 0);
+                            if (i == 0) {
+                                end = 1;
+                                break;
+                            }
+                            j += i;
+                        }
+                        if (end == 1) {
+                            break;
+                        }
+                        printf("%s\n", log->data);
+                        printf("\033[32mrecv complete\033[0m\n");
+                        char path[100] = {0};
+                        FILE *fp = NULL;
+                        printf("log filename is %s\n", log_filename[log->flag]);
+                        sprintf(path, "%s/%s", inet_ntoa(client_addr.sin_addr), log_filename[log->flag]);
+                        printf("log path is %s\n", path);
+                        fp = fopen(path, "a");
+                        if (fp == NULL) {
+                            perror("fopen:fp");
+                            break;
+                        }
+                        printf("\033[32mwriting ...\033[0m\n");
+                        fwrite(log->data, 1, strlen(log->data), fp);
+                        printf("\033[32mwriting complete\033[0m\n");
+                        fclose(fp);
                     }
+                    printf("recv complete, close connect\n");
+                    close(client);
                 }
             }
         }
