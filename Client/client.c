@@ -502,7 +502,7 @@ int main() {
                         printf("\033[32msend file ...\033[0m\n");
                         while (!feof(fp)) {
                             memset(log->data, 0, sizeof(log->data));
-                            int j = fread(log->data, 1, sizeof(log->data), fp);
+                            int j = fread(log->data, 1, MAX_SIZE, fp);
                             int ret = send(conn_sock, log, sizeof(Log), 0);
                             if (ret < 0) {
                                 printf("\033[31msend %s fail\033[0m\n", log_filename[i]);

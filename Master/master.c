@@ -125,14 +125,15 @@ void *do_event(void *i) {
                     while (1) {
                         printf("\033[32mrecv file ...\033[0m\n");
                         memset(log->data, 0, sizeof(log->data));
-                        int j = recv(client, log, log_size, 0);
+                        int j = recv(client, (char *)log, log_size, 0);
                         int end = 0;
                         if (j == 0) {
                             break;
                         }
                         while (j != log_size) {
+                            printf("\033[31m发生粘包\033[0m");
                             int left = log_size - j;
-                            int i = recv(client, log, left, 0);
+                            int i = recv(client, ((char *)log) + j, left, 0);
                             if (i == 0) {
                                 end = 1;
                                 break;
