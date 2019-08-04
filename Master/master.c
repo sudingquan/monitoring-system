@@ -18,14 +18,14 @@
 #define CONF "master_conf"
 #define MAX_SIZE 1024
 
-LinkList **link_client;
-
 char master_port[10];
 char client_heartbeat_port[10];
 char client_ctl_port[10];
 char from[20];
 char to[20];
 char ins[5];
+
+LinkList **link_client;
 
 typedef struct Log {
     char data[MAX_SIZE + 5];
