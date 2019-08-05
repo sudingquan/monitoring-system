@@ -7,8 +7,9 @@ EXEC=client
 all:${OBJS}
 	${CC} ${OBJS} -o ${EXEC} ${LFLAGS}
 
-common.o:
-client.o:
+common.o : common.c
+client.o : client.c
 
+.PHONY : clean
 clean:
-	rm -rf ${OBJS}
+	-rm -f ${OBJS}

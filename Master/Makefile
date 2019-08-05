@@ -7,8 +7,9 @@ EXEC=master
 all:${OBJS}
 	${CC} ${OBJS} -o ${EXEC} ${LFLAGS}
 
-common.o:
-master.o:
+common.o : common.c
+master.o : master.c
 
+.PHONY : clean
 clean:
-	rm -rf ${OBJS}
+	-rm -f ${OBJS}
