@@ -51,4 +51,9 @@ int heartbeat(int port, char *host);
 // conf 
 int get_conf(char *file, char *key, char *val);
 // conf end
+
+// log
+int my_log(char *filename, const char *format, ...) {
+// log end
+
 #endif

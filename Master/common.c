@@ -6,11 +6,14 @@
  ************************************************************************/
 
 #include <stdio.h>
+#include <time.h>
 #include <string.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -250,4 +253,30 @@ int get_conf(char *file, char *key, char *val) {
     fclose(fp);
     fp = NULL;
     return flag;
+}
+
+int my_log(char *filename, const char *format, ...) {
+    va_list list;
+    FILE *fp = NULL;
+    fp = fopen(filename, "a+");
+    if (fp == NULL) {
+        perror("fopen");
+        return -1;
+    }
+    if (flock(fileno(fp), LOCK_EX) < 0) {
+        perror("flock:fp");
+        return -1;
+    }
+    va_start(list, format);
+    time_t curtime;
+    time(&curtime);
+    char s_t[100];
+    sprintf(s_t, "%s", ctime(&curtime));
+    s_t[strlen(s_t) - 1] = '\0';
+    fprintf(fp, "%s ",s_t);
+    int done = vfprintf(fp, format, list);
+    va_end(list);
+    fflush(fp);
+    fclose(fp);
+    return done;
 }
