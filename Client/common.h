@@ -53,7 +53,10 @@ int get_conf(char *file, char *key, char *val);
 // conf end
 
 // log
-int my_log(char *filename, const char *format, ...) {
+int my_log(char *filename, const char *format, ...);
 // log end
 
+// daemon
+void init_daemon();
+// daemon end
 #endif

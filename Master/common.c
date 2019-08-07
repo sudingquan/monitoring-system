@@ -16,6 +16,7 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include "common.h"
 
@@ -279,4 +280,29 @@ int my_log(char *filename, const char *format, ...) {
     fflush(fp);
     fclose(fp);
     return done;
+}
+
+void init_daemon() {
+    int pid;
+    int i;
+    pid = fork();
+    if (pid != 0) {
+        exit(0); //结束父进程
+    } else if (pid < 0) {
+        exit(EXIT_FAILURE);
+    }
+    setsid();//第一子进程成为新的会话组长和进程组长并与控制终端分离
+    pid = fork();
+    if (pid != 0) {
+        exit(0);//结束第一子进程
+    } else if (pid < 0) {
+        exit(1);
+    }
+    //第二子进程不再是会话组长
+    for(i = 0; i < NOFILE; i++) {
+        close(i);
+    }
+    chdir("/");
+    umask(0);
+    return ;
 }
