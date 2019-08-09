@@ -43,8 +43,6 @@ void set_reuseaddr(int sockfd, int optval);
 
 int create_listen_socket(int port);
 
-int wait_client(int listen_socket);
-
 int heartbeat(int port, char *host);
 // socket end
 

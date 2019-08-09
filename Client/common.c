@@ -113,7 +113,6 @@ int socket_connect(int port, char *host) {
 	int sockfd;
 	struct sockaddr_in dest_addr;
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		perror("socket() error");
 		return -1;
 	}
 
@@ -125,8 +124,6 @@ int socket_connect(int port, char *host) {
     unsigned int imode = 1;
     ioctl(sockfd, FIONBIO, &imode);
     
-	//printf("Connetion TO %s:%d\n",host,port);
-	//printf(stdout);
 	connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
 	return sockfd;
 }
@@ -134,7 +131,6 @@ int socket_connect(int port, char *host) {
 int create_listen_socket(int port) {
     int listen_socket;
     if ((listen_socket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        perror("socket() error");
         return -1;
     }
     struct sockaddr_in my_addr;
@@ -145,31 +141,15 @@ int create_listen_socket(int port) {
     
     int yes = 1;
     if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-        perror("set spckopt reuse");
         return -1;
     }
 
     if (bind(listen_socket, (struct sockaddr *)&my_addr, sizeof(my_addr)) < 0) {
-        perror("bind");
         return -1;
     }
     if (listen(listen_socket, 5) < 0) {
-        perror("listen");
     }
     return listen_socket;
-}
-
-int wait_client(int listen_socket) {
-    struct sockaddr_in client_addr;
-    printf("wait for client...\n");
-    unsigned int addrlen = sizeof(client_addr);
-    int client_socket = accept(listen_socket, (struct sockaddr *)&client_addr, &addrlen);
-    if (client_socket < 0) {
-        perror("accept");
-        return -1;
-    }
-    printf("connection to the client %s successful\n", inet_ntoa(client_addr.sin_addr));
-    return client_socket;
 }
 
 int heartbeat(int port, char *host) {
@@ -178,8 +158,7 @@ int heartbeat(int port, char *host) {
     struct timeval timeout;
 	struct sockaddr_in dest_addr;
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		perror("socket() error");
-		exit(1);
+		return -1;
 	}
 
 	memset(&dest_addr, 0, sizeof(dest_addr));
@@ -187,8 +166,6 @@ int heartbeat(int port, char *host) {
 	dest_addr.sin_port = htons(port);
 	dest_addr.sin_addr.s_addr = inet_addr(host);
 
-	//printf("Connetion TO %s:%d\n",host,port);
-	//fflush(stdout);
     fd_set wfds;
     FD_ZERO(&wfds);
     FD_SET(sockfd, &wfds);
@@ -203,12 +180,9 @@ int heartbeat(int port, char *host) {
     ioctl(sockfd, FIONBIO, &imode);
     int n = connect(sockfd, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (n < 0 && errno == EINPROGRESS) {
-        //printf("in if....\n");
         retval = select(sockfd + 1, NULL, &wfds, NULL, &timeout);
         if (retval > 0) {
-            //printf("in if if....\n");
             if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, (socklen_t *)&len) < 0) {
-                perror("getsockopt");
                 ret = -1;
             }
             if (error == 0) {
@@ -239,7 +213,6 @@ int get_conf(char *file, char *key, char *val) {
             continue;
         }
         if (str[strlen(key)] != '=') {
-            printf("no =\n");
             fp = NULL;
             fclose(fp);
             return -1;
@@ -261,17 +234,15 @@ int my_log(char *filename, const char *format, ...) {
     FILE *fp = NULL;
     fp = fopen(filename, "a+");
     if (fp == NULL) {
-        perror("fopen");
         return -1;
     }
     if (flock(fileno(fp), LOCK_EX) < 0) {
-        perror("flock:fp");
         return -1;
     }
     va_start(list, format);
     time_t curtime;
     time(&curtime);
-    char s_t[100];
+    char s_t[1024] = {0};
     sprintf(s_t, "%s", ctime(&curtime));
     s_t[strlen(s_t) - 1] = '\0';
     fprintf(fp, "%s ",s_t);
@@ -286,20 +257,20 @@ void init_daemon() {
     int pid;
     int i;
     pid = fork();
-    if (pid != 0) {
+    if (pid > 0) {
         exit(0); //结束父进程
     } else if (pid < 0) {
         exit(EXIT_FAILURE);
     }
     setsid();//第一子进程成为新的会话组长和进程组长并与控制终端分离
     pid = fork();
-    if (pid != 0) {
+    if (pid > 0) {
         exit(0);//结束第一子进程
     } else if (pid < 0) {
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     //第二子进程不再是会话组长
-    for(i = 0; i < NOFILE; i++) {
+    for(i = 0; i < 3; i++) {
         close(i);
     }
     chdir("/");

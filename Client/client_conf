@@ -1,4 +1,7 @@
-master=192.168.1.46
+master=192.168.1.41
 master_port=9973
 heartbeat_client_port=8086
 ctl_client_port=9999
+datadir=/tmp/sdq_client_data
+PiHealthLog=/tmp/pihealth_client.log
+scriptdir=/tmp/sdq_script
