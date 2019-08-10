@@ -8,7 +8,6 @@
 │   ├── common.c
 │   ├── common.h
 │   └── send_client.sh
-├── LogManger
 ├── Master
 │   ├── Makefile
 │   ├── common.c
@@ -24,5 +23,5 @@
     ├── SysInfo.sh
     └── Users.sh
 
-4 directories, 18 files
+3 directories, 18 files
 ```
