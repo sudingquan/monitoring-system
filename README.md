@@ -4,16 +4,16 @@
 ├── Client
 │   ├── Makefile
 │   ├── client.c
-│   ├── client_conf
 │   ├── common.c
 │   ├── common.h
+│   ├── pihealth_client_sdq.conf.sample
 │   └── send_client.sh
 ├── Master
 │   ├── Makefile
 │   ├── common.c
 │   ├── common.h
 │   ├── master.c
-│   └── master_conf
+│   └── pihealth_master_sdq.conf.sample
 ├── README.md
 └── script
     ├── CpuLog.sh
