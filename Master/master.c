@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include "common.h"
-#define CONF "/tmp/master.conf"
+#define CONF "/tmp/pihealth_master_sdq.conf"
 #define MAX_SIZE 1024
 
 char master_port[10];
@@ -46,6 +46,7 @@ void *continue_heartbeat(void *a) {
                 //fflush(stdout);
                 if (heartbeat(ntohs(q->data.sin_port), inet_ntoa(q->data.sin_addr)) == 0) {
                     //printf("%s : %d \033[32monline\033[0m !\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
+                    my_log(PiHealthLog, "[Note] [continue_heartbeat] : %s:%d online\n", inet_ntoa(q->data.sin_addr), ntohs(q->data.sin_port));
                     p = p->next;
                     q = q->next;
                 } else {
@@ -61,7 +62,7 @@ void *continue_heartbeat(void *a) {
             sleep(1);
         }
         //printf("End of all traversal !\n");
-        sleep(3);
+        sleep(5);
     }
 }
 
@@ -354,7 +355,7 @@ int main() {
             }
             if (insert(link_client[min], link_client[min]->length, client) > 0) {
                 //printf("insert %s to LinkList <%d> success\n", inet_ntoa((client.sin_addr)), min);
-                my_log(PiHealthLog, "[Note] [insert] : %s online\n", inet_ntoa(client.sin_addr));
+                //my_log(PiHealthLog, "[Note] [insert] : %s \n", inet_ntoa(client.sin_addr));
 
             } else {
                 //printf("insert %s to LinkList <%d> failed\n", inet_ntoa((client.sin_addr)), min);

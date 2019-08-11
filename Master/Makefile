@@ -2,7 +2,7 @@
 CC=gcc
 OBJS=common.o master.o
 LFLAGS=-lpthread
-EXEC=master
+EXEC=pihealth_master_sdq
 
 all:${OBJS}
 	${CC} ${OBJS} -o ${EXEC} ${LFLAGS}
@@ -13,3 +13,8 @@ master.o : master.c
 .PHONY : clean
 clean:
 	-rm -f ${OBJS}
+
+install: pihealth_master_sdq pihealth_master_sdq.conf.sample
+	@test -f /tmp/pihealth_master_sdq.conf.sample || cp pihealth_master_sdq.conf.sample /tmp/pihealth_master_sdq.conf
+	#@cp -f pihealth_master_sdq /usr/bin
+	@echo "pihealth_master_sdq installed"

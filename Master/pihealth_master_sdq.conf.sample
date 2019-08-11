@@ -4,5 +4,5 @@ master_port=9973
 client_heartbeat_port=8086
 client_ctl_port=9999
 datadir=/tmp/sdq_master_data
-PiHealthLog=/tmp/pihealth_master.log
+PiHealthLog=/tmp/pihealth_master_sdq.log
 INS=4
