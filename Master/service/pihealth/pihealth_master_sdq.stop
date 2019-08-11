@@ -1,0 +1,14 @@
+#!/bin/bash
+pid=`cat /etc/pihealth_master_sdq.pid`
+if [[ -n ${pid} ]]; then
+    ps -ef | grep -w ${pid} | grep pihealth_master_sdq > /dev/null
+    if [[ $? -eq 0 ]]; then
+        kill ${pid}
+        echo "pihealth_master_sdq stopped."
+    else 
+        echo "pihealth_master_sdq has alreadly stopped."
+        exit 0
+    fi
+else 
+    echo "pihealth_master_sdq stopped."
+fi

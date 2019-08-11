@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include "common.h"
-#define CONF "/tmp/pihealth_master_sdq.conf"
+#define CONF "/etc/pihealth_master_sdq.conf"
 #define MAX_SIZE 1024
 
 char master_port[10];

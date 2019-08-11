@@ -1,0 +1,13 @@
+[Unit]
+Description=pihealth_master_sdq
+After=syslog.target network.target remote-fs.target nss-lookup.target
+
+
+[Service]
+Type=forking
+ExecStart=/usr/bin/pihealth/pihealth_master_sdq.start
+ExecStop=/usr/bin/pihealth/pihealth_master_sdq.stop
+
+
+[Install]
+WantedBy=multi-user.target

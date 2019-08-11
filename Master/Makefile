@@ -14,7 +14,9 @@ master.o : master.c
 clean:
 	-rm -f ${OBJS}
 
-install: pihealth_master_sdq pihealth_master_sdq.conf.sample
-	@test -f /tmp/pihealth_master_sdq.conf.sample || cp pihealth_master_sdq.conf.sample /tmp/pihealth_master_sdq.conf
-	#@cp -f pihealth_master_sdq /usr/bin
+install: pihealth_master_sdq pihealth_master_sdq.conf.sample ./service/pihealth/pihealth_master_sdq.start ./service/pihealth/pihealth_master_sdq.stop ./service/pihealth_master_sdq.service
+	@test -f /etc/pihealth_master_sdq.conf.sample || cp pihealth_master_sdq.conf.sample /etc/pihealth_master_sdq.conf
+	@cp -f pihealth_master_sdq /usr/bin
+	@cp -f ./service/pihealth_master_sdq.service /lib/systemd/system
+	@cp -rf ./service/pihealth/ /usr/bin/
 	@echo "pihealth_master_sdq installed"
